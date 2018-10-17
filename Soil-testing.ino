@@ -29,15 +29,11 @@
 static char celsiusTemp[7];
 static char fahrenheitTemp[7];
 static char humidityTemp[7];
-// Client variables
-char linebuf[80];
-int charcount = 0;
 // DHT Sensor
 const int DHTPin = 22;
 WebServer server(80);
 // Initialize DHT sensor.
 DHT dht(DHTPin, DHTTYPE);
-// Temporary variables
 
 
 bool autoConfig()

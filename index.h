@@ -39,7 +39,7 @@ const char MAIN_page[] PROGMEM = R"=====(
   </style>
 </head>
 <body>
-  <h1>ESP32 with DHT</h1>
+  <h1>SOIL TESTING</h1>
   <table>
     <tr>
       <th>MEASUREMENT</th>
