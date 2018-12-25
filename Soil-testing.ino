@@ -3,90 +3,93 @@
 #include <ESPmDNS.h>
 #include <WebServer.h>
 #include "index.h"
+#include <WiFiMulti.h>
+
+// #define USE_FIXED_WIFI_PASSWD
+
+#define WIFI_SSID_1 "TP-LINK_2746"
+#define WIFI_SSID_2 "Xiaomi"
+#define WIFI_PASSWORD_1 "AA15994823428"
+#define WIFI_PASSWORD_2 "12345678"
 
 // Uncomment one of the lines below for whatever DHT sensor type you're using!
 //#define DHTTYPE DHT11   // DHT 11
 //#define DHTTYPE DHT21   // DHT 21 (AM2301)
-#define DHTTYPE DHT11   // DHT 22  (AM2302), AM2321
+#define DHTTYPE DHT11 // DHT 22  (AM2302), AM2321
+#define WIFI_TIMEOUT 30000
 
-// You can comment this line and turn off the serial output.
-#define APP_LOG_ENABLE
+#define LED_PIN 16
+#define DTH_SENSOR_PIN 22
 
-#ifdef APP_LOG_ENABLE
-#define APP_LOG(...)           \
-    Serial.printf(__VA_ARGS__); \
-    Serial.println();
-
-#define APP_LOG_BEGIN() do{\
-    Serial.begin(115200);\
-    while (!Serial) {}\
-  }while(0)
-#else
-#define APP_LOG(...)
-#define APP_LOG_BEGIN()
-#endif
+WiFiMulti wifiMulti;
 
 static char celsiusTemp[7];
 static char fahrenheitTemp[7];
 static char humidityTemp[7];
-// DHT Sensor
-const int DHTPin = 22;
-WebServer server(80);
-// Initialize DHT sensor.
-DHT dht(DHTPin, DHTTYPE);
 
+// Initialize DHT sensor.
+DHT dht(DTH_SENSOR_PIN, DHTTYPE);
+WebServer server(80);
 
 bool autoConfig()
 {
   WiFi.begin();
   for (int i = 0; i < 20; i++)
   {
-    if ( WiFi.status() == WL_CONNECTED)
+    if (WiFi.status() == WL_CONNECTED)
     {
-      APP_LOG("AutoConfig Success");
-      APP_LOG("SSID:%s", WiFi.SSID().c_str());
-      APP_LOG("PSW:%s", WiFi.psk().c_str());
+      Serial.println("AutoConfig Success");
+      Serial.print("SSID: ");
+      Serial.println(WiFi.SSID());
+      Serial.print("PSW: ");
+      Serial.println(WiFi.psk());
       return true;
     }
-    APP_LOG("AutoConfig Waiting......");
+    Serial.println("AutoConfig Waiting......");
     delay(1000);
   }
-  APP_LOG("AutoConfig Faild!" );
+  Serial.println("AutoConfig Faild!");
   return false;
 }
 
 void smartConfig()
 {
   WiFi.mode(WIFI_STA);
-  APP_LOG("Wait for Smartconfig");
+  Serial.println("Wait for Smartconfig");
   WiFi.beginSmartConfig();
 
-  while(!WiFi.smartConfigDone())
+  while (!WiFi.smartConfigDone())
   {
-    APP_LOG(".");
-    delay(1000); 
+    Serial.print(".");
+    delay(1000);
   }
-  APP_LOG("SmartConfig Success");
-  APP_LOG("SSID:%s\r\n", WiFi.SSID().c_str());
-  APP_LOG("PSW:%s\r\n", WiFi.psk().c_str());
-  WiFi.setAutoConnect(true); 
+  Serial.println("SmartConfig Success");
+  Serial.print("SSID: ");
+  Serial.println(WiFi.SSID());
+  Serial.print("PSW: ");
+  Serial.println(WiFi.psk());
+  WiFi.stopSmartConfig();
+  WiFi.setAutoConnect(true);
 }
 
-void readDHTData(){
+void readDHTData()
+{
   // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
   float h = dht.readHumidity();
   // Read temperature as Celsius (the default)
   float t = dht.readTemperature();
   // Read temperature as Fahrenheit (isFahrenheit = true)
   float f = dht.readTemperature(true);
-  if (isnan(h) || isnan(t) || isnan(f)) {
-    APP_LOG("Failed to read from DHT sensor!");
+  if (isnan(h) || isnan(t) || isnan(f))
+  {
+    Serial.println("Failed to read from DHT sensor!");
     strcpy(celsiusTemp, "\"Failed\"");
     strcpy(fahrenheitTemp, "\"Failed\"");
     strcpy(humidityTemp, "\"Failed\"");
     return;
   }
-  else {
+  else
+  {
     // Computes temperature values in Celsius + Fahrenheit and Humidity
     float hic = dht.computeHeatIndex(t, h, false);
     dtostrf(hic, 6, 2, celsiusTemp);
@@ -96,15 +99,16 @@ void readDHTData(){
   }
 }
 
-// root page 
-void handleRootPage(){
-  APP_LOG("Get root page");
-  String s = MAIN_page; //Read HTML contents
+// root page
+void handleRootPage()
+{
+  String s = MAIN_page;             //Read HTML contents
   server.send(200, "text/html", s); //Send web page
 }
 
 // response json data
-void handleDHTData(){
+void handleDHTData()
+{
   readDHTData();
   String json = "{";
   json += "\"Fahrenheit\":";
@@ -117,40 +121,101 @@ void handleDHTData(){
   json += humidityTemp;
   json += ",";
   json += "\"Soil\":";
-  json += String(map(analogRead(32),0,4096,100,0));
+  json += String(map(analogRead(32), 0, 4096, 100, 0));
   json += ",";
   json += "\"IP\":";
   json += "\"";
   json += WiFi.localIP().toString();
   json += "\"";
   json += "}";
-  server.send(200, "text/plane",json); 
+  server.send(200, "text/plane", json);
 }
 
-void setup() {
+void setup()
+{
   // initialize the DHT sensor
   dht.begin();
 
   //Initialize serial and wait for port to open:
-  APP_LOG_BEGIN();
+  Serial.begin(115200);
 
+  pinMode(LED_PIN, OUTPUT);
+  int i = 3;
+  while (i--)
+  {
+    digitalWrite(LED_PIN, HIGH);
+    delay(500);
+    digitalWrite(LED_PIN, LOW);
+    delay(500);
+  }
+  digitalWrite(LED_PIN, HIGH);
+
+#ifdef USE_FIXED_WIFI_PASSWD
+
+  wifiMulti.addAP(WIFI_SSID_1, WIFI_PASSWORD_1);
+  wifiMulti.addAP(WIFI_SSID_2, WIFI_PASSWORD_2);
+
+  Serial.println("Connecting Wifi...");
+
+  while (wifiMulti.run() != WL_CONNECTED)
+  {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.print("Connecting to ");
+  Serial.println(WiFi.SSID());
+  Serial.println("");
+  Serial.println("WiFi connected");
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+  Serial.println();
+#else
   // We start by connecting to a WiFi network
   if (!autoConfig())
   {
-    APP_LOG("Starting SmartConfig...");
+    Serial.println("Starting SmartConfig...");
     smartConfig();
   }
-  APP_LOG("IP Address : %s",WiFi.localIP().toString().c_str());
-  // Start MDNS Server,Point your browser to http://esp32.local, you should see a response.
-  if (MDNS.begin("esp32")) {
-    APP_LOG("MDNS responder started");
+  Serial.println("IP Address :");
+  Serial.println(WiFi.localIP());
+  //Start MDNS Server, Point your browser to http : //esp32.local, you should see a response.
+#endif
+
+  if (MDNS.begin("esp32"))
+  {
+    Serial.println("MDNS responder started");
   }
 
-  server.on("/",handleRootPage);
-  server.on("/readData",handleDHTData);
-  server.begin();                  //Start server
+  server.on("/", handleRootPage);
+  server.on("/readData", handleDHTData);
+  server.begin();
+
+  MDNS.addService("http", "tcp", 80);
 }
 
-void loop() {
-  server.handleClient();          //Handle client requests
+void loop()
+{
+#ifdef USE_FIXED_WIFI_PASSWD
+  wifiMulti.run();
+#else
+  static unsigned long last_wifi_check_time = 0;
+  unsigned long now = millis();
+
+  if (now - last_wifi_check_time > WIFI_TIMEOUT)
+  {
+    Serial.print("Checking WiFi... ");
+    if (WiFi.status() != WL_CONNECTED)
+    {
+      Serial.println("WiFi connection lost. Reconnecting...");
+      WiFi.reconnect();
+    }
+    else
+    {
+      Serial.println("OK");
+    }
+    last_wifi_check_time = now;
+  }
+#endif
+
+  server.handleClient(); //Handle client requests
 }
